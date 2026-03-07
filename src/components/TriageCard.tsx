@@ -65,7 +65,7 @@ export default function TriageCard({
   }
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl" style={{ backgroundColor: "var(--card-bg)" }}>
+    <div className="flex h-full flex-col overflow-hidden rounded-xl" style={{ backgroundColor: "var(--card-bg)" }}>
       {/* Coloured top band */}
       <div
         className="flex items-center justify-between px-3 py-2"
@@ -87,15 +87,15 @@ export default function TriageCard({
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between rounded-full px-4 py-1.5" style={{ backgroundColor: "var(--pill-bg)" }}>
             <span className="text-sm font-semibold text-white">Heart Rate</span>
-            <span className="text-sm font-semibold text-white">{heartRate ?? "???"} <span className="font-normal">bpm</span></span>
+            <span className="text-sm font-semibold text-white">{heartRate || "???"} <span className="font-normal">bpm</span></span>
           </div>
           <div className="flex items-center justify-between rounded-full px-4 py-1.5" style={{ backgroundColor: "var(--pill-bg)" }}>
             <span className="text-sm  font-semibold text-white">Resp. Rate</span>
-            <span className="text-sm font-semibold text-white">{respiratoryRate ?? "???"}<span className="font-normal">/min</span></span>
+            <span className="text-sm font-semibold text-white">{respiratoryRate || "???"}<span className="font-normal">/min</span></span>
           </div>
           <div className="flex items-center justify-between rounded-full px-4 py-1.5" style={{ backgroundColor: "var(--pill-bg)" }}>
             <span className="text-sm font-semibold text-white">Blood Pressure</span>
-            <span className="text-sm font-semibold text-white">{bloodPressure ?? "???"}</span>
+            <span className="text-sm font-semibold text-white">{bloodPressure || "???"}</span>
           </div>
         </div>
 

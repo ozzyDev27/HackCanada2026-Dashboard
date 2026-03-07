@@ -29,7 +29,7 @@ async function summarizeSymptoms(id: string, symptoms: string) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-  const prompt = `You are a medical scribe. A patient described their symptoms in their own words. Rewrite it as a concise, clinical one-sentence summary suitable for a triage card. Keep it under 15 words. No quotes, no punctuation at the end.
+  const prompt = `You are a triage nurse writing a quick note for a patient card. Summarize the patient's reported symptoms in plain, simple English. Write one sentence starting with "Patient has". Keep it natural and easy to read — avoid medical jargon. Under 20 words.
 
 Patient's words: "${symptoms}"`;
 
@@ -102,8 +102,8 @@ export async function POST(request: Request) {
 
     const newRecord = addRecord({
       seatNumber: body.seatNumber.toString(),
-      heartRate: body.heartRate !== undefined ? Number(body.heartRate) : undefined,
-      respiratoryRate: body.respiratoryRate !== undefined ? Number(body.respiratoryRate) : undefined,
+      heartRate: body.heartRate ? Number(body.heartRate) : undefined,
+      respiratoryRate: body.respiratoryRate ? Number(body.respiratoryRate) : undefined,
       bloodPressure: body.bloodPressure ? body.bloodPressure.toString() : undefined,
       symptoms: body.symptoms ? body.symptoms.toString() : undefined,
       healthCardNumber,

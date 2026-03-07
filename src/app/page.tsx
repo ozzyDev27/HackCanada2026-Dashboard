@@ -145,15 +145,16 @@ export default function Home() {
             <p className="mt-1 text-sm">New triage records will appear here automatically.</p>
           </div>
         ) : (
-          <AnimatePresence mode="popLayout">
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" style={{ gridAutoRows: "460px" }}>
+            <AnimatePresence mode="popLayout">
               {sorted.map((record) => (
                 <motion.div
                   key={record.id}
                   layout
+                  className="h-full"
                   initial={{ opacity: 0, scale: 0.85 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.75, transition: { duration: 0.25, ease: "easeIn" } }}
+                  exit={{ opacity: 0, transition: { duration: 0.3, ease: "easeIn" } }}
                   transition={{ duration: 0.35, ease: "easeOut" }}
                 >
                   <TriageCard
@@ -174,8 +175,8 @@ export default function Home() {
                   />
                 </motion.div>
               ))}
-            </div>
-          </AnimatePresence>
+            </AnimatePresence>
+          </div>
         )}
       </main>
     </div>
