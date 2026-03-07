@@ -1,3 +1,13 @@
+interface PatientInfo {
+  healthCardNumber: string;
+  name: string;
+  dob: string;
+  bloodType: string;
+  allergies: string[];
+  conditions: string[];
+  medications: string[];
+}
+
 interface TriageCardProps {
   id: string;
   seatNumber: number;
@@ -8,6 +18,7 @@ interface TriageCardProps {
   timestamp: string;
   priorityRank?: number;
   riskLevel?: "red" | "yellow" | "green";
+  patientInfo?: PatientInfo;
   onDismiss?: () => void;
 }
 
@@ -20,6 +31,7 @@ export default function TriageCard({
   timestamp,
   priorityRank,
   riskLevel,
+  patientInfo,
   onDismiss,
 }: TriageCardProps) {
   const cardStyles = {
@@ -134,6 +146,40 @@ export default function TriageCard({
           <p className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-2">
             {symptoms}
           </p>
+        </div>
+      )}
+
+      {patientInfo ? (
+        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+          <h4 className="text-xs font-medium uppercase tracking-wider text-blue-500 dark:text-blue-400 mb-2">
+            Health Card #{patientInfo.healthCardNumber}
+          </h4>
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{patientInfo.name}</p>
+          <p className="text-xs text-zinc-500 mb-2">
+            DOB: {new Date(patientInfo.dob).toLocaleDateString()} &middot; Blood Type: {patientInfo.bloodType}
+          </p>
+          {patientInfo.conditions.length > 0 && (
+            <div className="mb-1">
+              <span className="text-xs font-medium text-zinc-500">Conditions: </span>
+              <span className="text-xs text-zinc-700 dark:text-zinc-300">{patientInfo.conditions.join(", ")}</span>
+            </div>
+          )}
+          {patientInfo.allergies.length > 0 && (
+            <div className="mb-1">
+              <span className="text-xs font-medium text-red-500">Allergies: </span>
+              <span className="text-xs text-zinc-700 dark:text-zinc-300">{patientInfo.allergies.join(", ")}</span>
+            </div>
+          )}
+          {patientInfo.medications.length > 0 && (
+            <div>
+              <span className="text-xs font-medium text-zinc-500">Medications: </span>
+              <span className="text-xs text-zinc-700 dark:text-zinc-300">{patientInfo.medications.join(", ")}</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50/50 p-3 dark:border-zinc-800/50 dark:bg-zinc-800/20">
+          <p className="text-xs text-zinc-400 dark:text-zinc-500 italic">No health card on file</p>
         </div>
       )}
     </div>

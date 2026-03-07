@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { addRecord, deleteRecord, getRecords, setRiskLevel, updatePriorities } from "@/lib/store";
+import healthCards from "@/lib/healthcards.json";
 
 async function assessRisk(id: string, record: { seatNumber: string | number; heartRate: number; respiratoryRate: number; bloodPressure: string; symptoms?: string }) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -68,12 +69,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const healthCardNumber = body.healthCardNumber ? String(body.healthCardNumber) : "";
+    const patientInfo = healthCardNumber ? (healthCards.find((c) => c.healthCardNumber === healthCardNumber) ?? undefined) : undefined;
+
     const newRecord = addRecord({
       seatNumber: body.seatNumber.toString(),
       heartRate: Number(body.heartRate),
       respiratoryRate: Number(body.respiratoryRate),
       bloodPressure: body.bloodPressure.toString(),
       symptoms: body.symptoms ? body.symptoms.toString() : undefined,
+      healthCardNumber,
+      patientInfo,
     });
 
     // Assess risk and re-rank all patients with Gemini in the background

@@ -3,6 +3,16 @@
 import { useEffect, useState } from "react";
 import TriageCard from "@/components/TriageCard";
 
+interface PatientInfo {
+  healthCardNumber: string;
+  name: string;
+  dob: string;
+  bloodType: string;
+  allergies: string[];
+  conditions: string[];
+  medications: string[];
+}
+
 interface TriageRecord {
   id: string;
   seatNumber: number;
@@ -13,6 +23,7 @@ interface TriageRecord {
   timestamp: string;
   priorityRank?: number;
   riskLevel?: "red" | "yellow" | "green";
+  patientInfo?: PatientInfo;
 }
 
 export default function Home() {
@@ -119,6 +130,7 @@ export default function Home() {
                 timestamp={record.timestamp}
                 priorityRank={record.priorityRank}
                 riskLevel={record.riskLevel}
+                patientInfo={record.patientInfo}
                 onDismiss={() => dismissRecord(record.id)}
               />
             ))}

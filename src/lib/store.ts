@@ -1,9 +1,20 @@
+export interface PatientInfo {
+  healthCardNumber: string;
+  name: string;
+  dob: string;
+  bloodType: string;
+  allergies: string[];
+  conditions: string[];
+  medications: string[];
+}
+
 export interface VitalSigns {
   seatNumber: string;
   heartRate: number;
   respiratoryRate: number;
   bloodPressure: string;
   symptoms?: string;
+  healthCardNumber: string;
 }
 
 export interface TriageRecord extends VitalSigns {
@@ -11,6 +22,7 @@ export interface TriageRecord extends VitalSigns {
   timestamp: string;
   priorityRank?: number;
   riskLevel?: "red" | "yellow" | "green";
+  patientInfo?: PatientInfo;
 }
 
 // Global in-memory store for a Next.js server environment.
