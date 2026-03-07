@@ -3,21 +3,23 @@ import { NextResponse } from "next/server";
 import { addRecord, deleteRecord, getRecords, setHealthCardSummary, setRiskLevel, setSymptomSummary, updatePriorities, upsertRecord } from "@/lib/store";
 import healthCards from "@/lib/healthcards.json";
 
-// Single Gemini call that returns riskLevel + symptomSummary + healthCardSummary in one shot
-async function analyzePatient(
-  id: string,
-  record: { seatNumber: string | number; heartRate?: number; respiratoryRate?: number; bloodPressure?: string; symptoms?: string },
+// One Gemini call: analyze the new patient AND rank all patients at the same time
+async function analyzeAndRank(
+  newId: string,
+  newRecord: { seatNumber: string | number; heartRate?: number; respiratoryRate?: number; bloodPressure?: string; symptoms?: string },
   patientInfo?: { allergies: string[]; conditions: string[]; medications: string[] },
   previousSymptoms?: string
 ) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
-  const patientData = {
-    heartRate: record.heartRate ?? "N/A",
-    respiratoryRate: record.respiratoryRate ?? "N/A",
-    bloodPressure: record.bloodPressure ?? "N/A",
-    symptoms: record.symptoms ?? "none reported",
+  const allRecords = getRecords();
+
+  const newPatientData = {
+    heartRate: newRecord.heartRate ?? "N/A",
+    respiratoryRate: newRecord.respiratoryRate ?? "N/A",
+    bloodPressure: newRecord.bloodPressure ?? "N/A",
+    symptoms: newRecord.symptoms ?? "none reported",
   };
 
   const healthCardSection = patientInfo
@@ -26,74 +28,61 @@ Conditions: ${patientInfo.conditions.join(", ") || "none"}
 Medications: ${patientInfo.medications.join(", ") || "none"}`
     : null;
 
-  const prompt = `You are a medical triage AI. Analyze this patient and respond with ONLY a valid JSON object — no markdown, no explanation.
+  const otherPatients = allRecords
+    .filter((r) => r.id !== newId)
+    .map((r) => ({
+      id: r.id,
+      heartRate: r.heartRate ?? "N/A",
+      respiratoryRate: r.respiratoryRate ?? "N/A",
+      bloodPressure: r.bloodPressure ?? "N/A",
+      symptoms: r.symptoms || "none reported",
+    }));
 
-Patient vitals and symptoms:
-${JSON.stringify(patientData, null, 2)}
+  const prompt = `You are a triage nurse. Be brief. Respond with ONLY a valid JSON object — no markdown, no explanation.
+
+New patient (id: "${newId}"):
+${JSON.stringify(newPatientData, null, 2)}
 ${healthCardSection ? `\nHealth card:\n${healthCardSection}` : ""}
-${previousSymptoms ? `\nPrevious symptom note: "${previousSymptoms}"` : ""}
+${previousSymptoms ? `\nPrevious note: "${previousSymptoms}"` : ""}
 
-Return exactly this JSON shape:
+All current patients (including new):
+${JSON.stringify([{ id: newId, ...newPatientData }, ...otherPatients], null, 2)}
+
+Return exactly this JSON:
 {
   "riskLevel": "red" | "yellow" | "green",
   "symptomSummary": "...",
-  "healthCardSummary": "...or null if no health card"
+  "healthCardSummary": "...or null",
+  "rankedIds": ["id-highest-priority", "id-next", ...]
 }
 
 Rules:
 - riskLevel: red = immediate threat, yellow = urgent but stable, green = non-urgent. N/A vitals are not dangerous on their own.
-- symptomSummary: plain English, no jargon, under 20 words. If there are previous symptoms, write a single sentence that combines old and new (e.g. "Patient had chest tightness and now also reports a severed finger"). Start with "Patient has" for new patients or "Patient had" when combining.
-- healthCardSummary: null if no health card data provided.`;
+- symptomSummary: one short plain-English sentence for the new patient. Combine with previous note if present.
+- healthCardSummary: only mention present allergies/conditions/medications. Null if nothing or no health card.
+- rankedIds: ALL patient IDs ordered from highest to lowest priority.`;
+
+  console.log(`[AI] ⏳ Sending request to Gemini for seat ${newRecord.seatNumber} (${allRecords.length} total patients)...`);
+  const t0 = Date.now();
 
   const result = await model.generateContent(prompt);
   const text = result.response.text().trim();
+
+  console.log(`[AI] ✅ Gemini responded in ${Date.now() - t0}ms`);
+
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("Gemini did not return valid JSON");
 
   const parsed = JSON.parse(match[0]);
 
-  if (["red", "yellow", "green"].includes(parsed.riskLevel)) {
-    setRiskLevel(id, parsed.riskLevel);
-  }
-  if (parsed.symptomSummary) {
-    setSymptomSummary(id, parsed.symptomSummary);
-  }
-  if (parsed.healthCardSummary) {
-    setHealthCardSummary(id, parsed.healthCardSummary);
-  }
-}
+  console.log(`[AI] risk=${parsed.riskLevel} | summary="${parsed.symptomSummary}" | ranked=${JSON.stringify(parsed.rankedIds)}`);
 
-async function rerankPatients() {
-  const records = getRecords();
-  if (records.length === 0) return;
+  if (["red", "yellow", "green"].includes(parsed.riskLevel)) setRiskLevel(newId, parsed.riskLevel);
+  if (parsed.symptomSummary) setSymptomSummary(newId, parsed.symptomSummary);
+  if (parsed.healthCardSummary) setHealthCardSummary(newId, parsed.healthCardSummary);
+  if (Array.isArray(parsed.rankedIds) && parsed.rankedIds.length > 0) updatePriorities(parsed.rankedIds);
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
-
-  const patientSummaries = records.map((r) => ({
-    id: r.id,
-    seatNumber: r.seatNumber,
-    heartRate: r.heartRate ?? "N/A",
-    respiratoryRate: r.respiratoryRate ?? "N/A",
-    bloodPressure: r.bloodPressure ?? "N/A",
-    symptoms: r.symptoms || "none reported",
-  }));
-
-  const prompt = `You are a medical triage AI. Given the following list of patients, rank them from highest to lowest clinical priority (most critical patient first). Use all available data: vital signs and reported symptoms. A patient with chest tightness, difficulty breathing, or dangerously abnormal vitals should rank above someone with a minor injury.
-
-Patients:
-${JSON.stringify(patientSummaries, null, 2)}
-
-Respond with ONLY a valid JSON array of patient IDs in order from highest to lowest priority. No explanation, no markdown, just the array. Example: ["id1", "id2", "id3"]`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().trim();
-
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error("Gemini response did not contain a valid JSON array");
-
-  const rankedIds: string[] = JSON.parse(match[0]);
-  updatePriorities(rankedIds);
+  console.log(`[AI] ✔ Store updated for seat ${newRecord.seatNumber}`);
 }
 
 export async function POST(request: Request) {
@@ -110,6 +99,9 @@ export async function POST(request: Request) {
     const healthCardNumber = body.healthCardNumber ? String(body.healthCardNumber) : "";
     const patientInfo = healthCardNumber ? (healthCards.find((c) => c.healthCardNumber === healthCardNumber) ?? undefined) : undefined;
 
+    const timeOffset: number = body.timeOffset ? Number(body.timeOffset) : 0;
+    const timestamp = new Date(Date.now() + timeOffset * 60 * 1000).toISOString();
+
     const { record: newRecord, previousSymptoms } = upsertRecord({
       seatNumber: body.seatNumber.toString(),
       heartRate: body.heartRate ? Number(body.heartRate) : undefined,
@@ -118,14 +110,11 @@ export async function POST(request: Request) {
       symptoms: body.symptoms ? body.symptoms.toString() : undefined,
       healthCardNumber,
       patientInfo,
-    });
+    }, timestamp);
 
-    // Single combined Gemini call for per-patient analysis, plus re-ranking — both in background
-    analyzePatient(newRecord.id, newRecord, patientInfo, previousSymptoms).catch((err) =>
-      console.error("Gemini patient analysis failed:", err)
-    );
-    rerankPatients().catch((err) =>
-      console.error("Gemini re-ranking failed:", err)
+    // Single Gemini call: analyze new patient + rank all in background
+    analyzeAndRank(newRecord.id, newRecord, patientInfo, previousSymptoms).catch((err) =>
+      console.error("Gemini analyze+rank failed:", err)
     );
 
     return NextResponse.json({ success: true, record: newRecord }, { status: 201 });

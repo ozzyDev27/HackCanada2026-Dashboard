@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import TriageCard from "@/components/TriageCard";
 
@@ -34,8 +34,10 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [clock, setClock] = useState("");
   const [filters, setFilters] = useState({ red: true, yellow: true, green: true });
+  const dismissedIds = useRef<Set<string>>(new Set());
 
   const dismissRecord = async (id: string) => {
+    dismissedIds.current.add(id);
     setRecords((prev) => prev.filter((r) => r.id !== id));
     try {
       await fetch(`/api/triage?id=${id}`, { method: "DELETE" });
@@ -44,12 +46,13 @@ export default function Home() {
     }
   };
 
-
   const fetchRecords = async () => {
     try {
       const res = await fetch("/api/triage");
       const data = await res.json();
-      if (data.records) setRecords(data.records);
+      if (data.records) {
+        setRecords(data.records.filter((r: TriageRecord) => !dismissedIds.current.has(r.id)));
+      }
     } catch (err) {
       console.error("Failed to fetch triage records:", err);
     } finally {

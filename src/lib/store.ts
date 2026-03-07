@@ -55,7 +55,8 @@ export function addRecord(record: Omit<TriageRecord, "id" | "timestamp">) {
 // Upserts by seat number: if the seat already exists, update vitals and carry forward old symptoms.
 // Returns the record and whether it was an update (true) or a new insert (false).
 export function upsertRecord(
-  record: Omit<TriageRecord, "id" | "timestamp">
+  record: Omit<TriageRecord, "id" | "timestamp">,
+  timestamp?: string
 ): { record: TriageRecord; previousSymptoms?: string } {
   const existing = triageRecords.find((r) => r.seatNumber === record.seatNumber);
 
@@ -67,7 +68,7 @@ export function upsertRecord(
     existing.symptoms = record.symptoms ?? existing.symptoms;
     existing.healthCardNumber = record.healthCardNumber ?? existing.healthCardNumber;
     existing.patientInfo = record.patientInfo ?? existing.patientInfo;
-    existing.timestamp = new Date().toISOString();
+    existing.timestamp = timestamp ?? new Date().toISOString();
     // Clear stale AI results so the card shows fresh data
     existing.riskLevel = undefined;
     existing.symptomSummary = undefined;
@@ -79,7 +80,7 @@ export function upsertRecord(
   const newRecord: TriageRecord = {
     ...record,
     id: crypto.randomUUID(),
-    timestamp: new Date().toISOString(),
+    timestamp: timestamp ?? new Date().toISOString(),
   };
   triageRecords.unshift(newRecord);
   return { record: newRecord };
