@@ -3,54 +3,62 @@ import { NextResponse } from "next/server";
 import { addRecord, deleteRecord, getRecords, setHealthCardSummary, setRiskLevel, setSymptomSummary, updatePriorities } from "@/lib/store";
 import healthCards from "@/lib/healthcards.json";
 
-async function assessRisk(id: string, record: { seatNumber: string | number; heartRate?: number; respiratoryRate?: number; bloodPressure?: string; symptoms?: string }) {
+// Single Gemini call that returns riskLevel + symptomSummary + healthCardSummary in one shot
+async function analyzePatient(
+  id: string,
+  record: { seatNumber: string | number; heartRate?: number; respiratoryRate?: number; bloodPressure?: string; symptoms?: string },
+  patientInfo?: { allergies: string[]; conditions: string[]; medications: string[] }
+) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
-  const prompt = `You are a medical triage AI. Assess the risk level of a single patient based on their vitals and symptoms.
+  const patientData = {
+    heartRate: record.heartRate ?? "N/A",
+    respiratoryRate: record.respiratoryRate ?? "N/A",
+    bloodPressure: record.bloodPressure ?? "N/A",
+    symptoms: record.symptoms ?? "none reported",
+  };
 
-Patient:
-${JSON.stringify(record, null, 2)}
-
-Classify the patient as exactly one of:
-- "red": immediate life threat, requires urgent intervention (e.g. not breathing, cardiac arrest, severe chest pain, critically abnormal vitals)
-- "yellow": urgent but not immediately life-threatening (e.g. moderate pain, mildly abnormal vitals, concerning symptoms)
-- "green": non-urgent, minor condition (e.g. small cuts, mild discomfort, normal vitals)
-
-Respond with ONLY one word: red, yellow, or green. No punctuation, no explanation.`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().trim().toLowerCase();
-  const level = ["red", "yellow", "green"].includes(text) ? (text as "red" | "yellow" | "green") : "yellow";
-  setRiskLevel(id, level);
-}
-
-async function summarizeSymptoms(id: string, symptoms: string) {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-  const prompt = `You are a triage nurse writing a quick note for a patient card. Summarize the patient's reported symptoms in plain, simple English. Write one sentence starting with "Patient has". Keep it natural and easy to read — avoid medical jargon. Under 20 words.
-
-Patient's words: "${symptoms}"`;
-
-  const result = await model.generateContent(prompt);
-  const summary = result.response.text().trim();
-  setSymptomSummary(id, summary);
-}
-
-async function summarizeHealthCard(id: string, patientInfo: { allergies: string[]; conditions: string[]; medications: string[] }) {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-  const prompt = `You are a medical scribe. Summarize the following patient health record into one concise clinical sentence for a triage card. Highlight anything relevant to emergency care (allergies, serious conditions, key medications). Keep it under 20 words. No quotes, no punctuation at the end.
-
-Allergies: ${patientInfo.allergies.join(", ") || "none"}
+  const healthCardSection = patientInfo
+    ? `Allergies: ${patientInfo.allergies.join(", ") || "none"}
 Conditions: ${patientInfo.conditions.join(", ") || "none"}
-Medications: ${patientInfo.medications.join(", ") || "none"}`;
+Medications: ${patientInfo.medications.join(", ") || "none"}`
+    : null;
+
+  const prompt = `You are a medical triage AI. Analyze this patient and respond with ONLY a valid JSON object — no markdown, no explanation.
+
+Patient vitals and symptoms:
+${JSON.stringify(patientData, null, 2)}
+${healthCardSection ? `\nHealth card:\n${healthCardSection}` : ""}
+
+Return exactly this JSON shape:
+{
+  "riskLevel": "red" | "yellow" | "green",
+  "symptomSummary": "Patient has ... (plain English, under 20 words, or null if no symptoms)",
+  "healthCardSummary": "One sentence highlighting allergies/conditions/medications relevant to emergency care, under 20 words, or null if no health card"
+}
+
+Rules:
+- riskLevel: red = immediate threat, yellow = urgent but stable, green = non-urgent. N/A vitals are not dangerous on their own.
+- symptomSummary: start with "Patient has", plain English, no jargon.
+- healthCardSummary: null if no health card data provided.`;
 
   const result = await model.generateContent(prompt);
-  const summary = result.response.text().trim();
-  setHealthCardSummary(id, summary);
+  const text = result.response.text().trim();
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("Gemini did not return valid JSON");
+
+  const parsed = JSON.parse(match[0]);
+
+  if (["red", "yellow", "green"].includes(parsed.riskLevel)) {
+    setRiskLevel(id, parsed.riskLevel);
+  }
+  if (parsed.symptomSummary) {
+    setSymptomSummary(id, parsed.symptomSummary);
+  }
+  if (parsed.healthCardSummary) {
+    setHealthCardSummary(id, parsed.healthCardSummary);
+  }
 }
 
 async function rerankPatients() {
@@ -58,14 +66,14 @@ async function rerankPatients() {
   if (records.length === 0) return;
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
   const patientSummaries = records.map((r) => ({
     id: r.id,
     seatNumber: r.seatNumber,
-    heartRate: r.heartRate,
-    respiratoryRate: r.respiratoryRate,
-    bloodPressure: r.bloodPressure,
+    heartRate: r.heartRate ?? "N/A",
+    respiratoryRate: r.respiratoryRate ?? "N/A",
+    bloodPressure: r.bloodPressure ?? "N/A",
     symptoms: r.symptoms || "none reported",
   }));
 
@@ -110,19 +118,11 @@ export async function POST(request: Request) {
       patientInfo,
     });
 
-    // Assess risk, summarize symptoms, and re-rank all patients with Gemini in the background
-    assessRisk(newRecord.id, newRecord).catch((err) =>
-      console.error("Gemini risk assessment failed:", err)
+    // Single combined Gemini call for per-patient analysis, plus re-ranking — both in background
+    analyzePatient(newRecord.id, newRecord, patientInfo).catch((err) =>
+      console.error("Gemini patient analysis failed:", err)
     );
-    if (newRecord.symptoms) {
-      summarizeSymptoms(newRecord.id, newRecord.symptoms).catch((err) =>
-        console.error("Gemini symptom summary failed:", err)
-      );
-    }    if (patientInfo) {
-      summarizeHealthCard(newRecord.id, patientInfo).catch((err) =>
-        console.error("Gemini health card summary failed:", err)
-      );
-    }    rerankPatients().catch((err) =>
+    rerankPatients().catch((err) =>
       console.error("Gemini re-ranking failed:", err)
     );
 
