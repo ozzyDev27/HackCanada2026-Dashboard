@@ -5,17 +5,28 @@ import TriageCard from "@/components/TriageCard";
 
 interface TriageRecord {
   id: string;
-  seatNumber: string;
+  seatNumber: number;
   heartRate: number;
   respiratoryRate: number;
   bloodPressure: string;
   symptoms?: string;
   timestamp: string;
+  priorityRank?: number;
+  riskLevel?: "red" | "yellow" | "green";
 }
 
 export default function Home() {
   const [records, setRecords] = useState<TriageRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const dismissRecord = async (id: string) => {
+    setRecords((prev) => prev.filter((r) => r.id !== id));
+    try {
+      await fetch(`/api/triage?id=${id}`, { method: "DELETE" });
+    } catch (err) {
+      console.error("Failed to delete triage record:", err);
+    }
+  };
 
   const fetchRecords = async () => {
     try {
@@ -33,7 +44,6 @@ export default function Home() {
 
   useEffect(() => {
     fetchRecords();
-    // Poll for new records every 5 seconds
     const intervalId = setInterval(fetchRecords, 5000);
     return () => clearInterval(intervalId);
   }, []);
@@ -48,15 +58,6 @@ export default function Home() {
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
               Live patient vitals monitoring
             </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="relative flex h-3 w-3">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500"></span>
-            </span>
-            <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-3 py-1 rounded-full">
-              System Active
-            </span>
           </div>
         </div>
       </header>
@@ -99,7 +100,14 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {records.map((record) => (
+            {[...records]
+              .sort((a, b) => {
+                if (a.priorityRank === undefined && b.priorityRank === undefined) return 0;
+                if (a.priorityRank === undefined) return 1;
+                if (b.priorityRank === undefined) return -1;
+                return a.priorityRank - b.priorityRank;
+              })
+              .map((record) => (
               <TriageCard
                 key={record.id}
                 id={record.id}
@@ -109,6 +117,9 @@ export default function Home() {
                 bloodPressure={record.bloodPressure}
                 symptoms={record.symptoms}
                 timestamp={record.timestamp}
+                priorityRank={record.priorityRank}
+                riskLevel={record.riskLevel}
+                onDismiss={() => dismissRecord(record.id)}
               />
             ))}
           </div>
