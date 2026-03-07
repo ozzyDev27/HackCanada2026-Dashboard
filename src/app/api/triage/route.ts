@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { addRecord, deleteRecord, getRecords, setHealthCardSummary, setRiskLevel, setSymptomSummary, updatePriorities, upsertRecord } from "@/lib/store";
 import healthCards from "@/lib/healthcards.json";
 
-// One Gemini call: analyze the new patient AND rank all patients at the same time
 async function analyzeAndRank(
   newId: string,
   newRecord: { seatNumber: string | number; heartRate?: number; respiratoryRate?: number; bloodPressure?: string; symptoms?: string },
@@ -112,14 +111,11 @@ export async function POST(request: Request) {
       patientInfo,
     }, timestamp);
 
-    // Single Gemini call: analyze new patient + rank all in background
-    analyzeAndRank(newRecord.id, newRecord, patientInfo, previousSymptoms).catch((err) =>
-      console.error("Gemini analyze+rank failed:", err)
-    );
+    analyzeAndRank(newRecord.id, newRecord, patientInfo, previousSymptoms).catch(console.error);
 
     return NextResponse.json({ success: true, record: newRecord }, { status: 201 });
   } catch (error) {
-    console.error("Error processing triage POST:", error);
+    console.error(error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
@@ -141,7 +137,7 @@ export async function DELETE(request: Request) {
     }
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error processing triage DELETE:", error);
+    console.error(error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

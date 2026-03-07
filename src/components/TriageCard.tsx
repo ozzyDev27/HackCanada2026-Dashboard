@@ -66,7 +66,6 @@ export default function TriageCard({
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl" style={{ backgroundColor: "var(--card-bg)" }}>
-      {/* Coloured top band */}
       <div
         className="flex items-center justify-between px-3 py-2"
         style={{ backgroundColor: bandColor[styleKey] }}
@@ -75,15 +74,12 @@ export default function TriageCard({
         <span className="text-sm font-semibold" style={{ color: bandText }}>{timeStr}</span>
       </div>
 
-      {/* Body */}
       <div className="flex flex-1 flex-col gap-3 px-4 pt-4 pb-4">
-        {/* Seat */}
         <p className="text-white">
           <span className="text-base font-bold">Seat number: </span>
           <span className="text-3xl font-bold">{seatNumber}</span>
         </p>
 
-        {/* Vitals */}
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between rounded-full px-4 py-1.5" style={{ backgroundColor: "var(--pill-bg)" }}>
             <span className="text-sm font-semibold text-white">Heart Rate</span>
@@ -99,13 +95,11 @@ export default function TriageCard({
           </div>
         </div>
 
-        {/* Symptoms */}
         <div>
           <p className="mb-0.5 text-sm font-bold text-white">Reported symptoms</p>
           <p className="text-sm text-zinc-300">{symptomSummary ?? symptoms ?? "None reported"}</p>
         </div>
 
-        {/* Health Card Notes */}
         <div>
           <p className="mb-0.5 text-sm font-bold text-white">Health Card Notes</p>
           {healthCardSummary ? (
@@ -119,7 +113,6 @@ export default function TriageCard({
           )}
         </div>
 
-        {/* Send to doctor */}
         <button
           onClick={onDismiss}
           className="mt-auto w-full rounded-xl py-2.5 text-sm font-bold transition"

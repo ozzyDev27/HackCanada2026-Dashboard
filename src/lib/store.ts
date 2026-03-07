@@ -28,19 +28,9 @@ export interface TriageRecord extends VitalSigns {
   patientInfo?: PatientInfo;
 }
 
-// Global in-memory store for a Next.js server environment.
-// In development, Next.js clears module state on HMR, so we attach it to the `global` object.
-// In production, normal variables work fine, but this handles both.
-
-const globalForStore = global as unknown as {
-  triageRecords: TriageRecord[];
-};
-
-export const triageRecords: TriageRecord[] = globalForStore.triageRecords || [];
-
-if (process.env.NODE_ENV !== "production") {
-  globalForStore.triageRecords = triageRecords;
-}
+const g = global as unknown as { triageRecords: TriageRecord[] };
+export const triageRecords: TriageRecord[] = g.triageRecords || [];
+if (process.env.NODE_ENV !== "production") g.triageRecords = triageRecords;
 
 export function addRecord(record: Omit<TriageRecord, "id" | "timestamp">) {
   const newRecord: TriageRecord = {
@@ -52,8 +42,6 @@ export function addRecord(record: Omit<TriageRecord, "id" | "timestamp">) {
   return newRecord;
 }
 
-// Upserts by seat number: if the seat already exists, update vitals and carry forward old symptoms.
-// Returns the record and whether it was an update (true) or a new insert (false).
 export function upsertRecord(
   record: Omit<TriageRecord, "id" | "timestamp">,
   timestamp?: string
@@ -69,7 +57,6 @@ export function upsertRecord(
     existing.healthCardNumber = record.healthCardNumber ?? existing.healthCardNumber;
     existing.patientInfo = record.patientInfo ?? existing.patientInfo;
     existing.timestamp = timestamp ?? new Date().toISOString();
-    // Clear stale AI results so the card shows fresh data
     existing.riskLevel = undefined;
     existing.symptomSummary = undefined;
     existing.healthCardSummary = undefined;

@@ -93,7 +93,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
       <header className="flex items-center justify-between px-8 py-5">
         <div className="text-sm text-zinc-400 leading-snug">
           <p>space save</p>
@@ -133,10 +132,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Purple separator */}
       <div className="h-1" style={{ backgroundColor: "var(--header-separator)" }} />
 
-      {/* Cards */}
       <main className="px-6 py-8">
         {loading ? (
           <div className="flex items-center justify-center py-20">
