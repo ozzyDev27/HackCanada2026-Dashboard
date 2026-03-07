@@ -58,8 +58,8 @@ Return exactly this JSON:
 
 Rules:
 - riskLevel: red = immediate threat, yellow = urgent but stable, green = non-urgent. N/A vitals are not dangerous on their own.
-- symptomSummary: one short plain-English sentence for the new patient. Combine with previous note if present.
-- healthCardSummary: only mention present allergies/conditions/medications. Null if nothing or no health card.
+- symptomSummary: a short symptom phrase, NOT a full sentence. No subject, no "patient complains of", no "presents with". Just the symptom itself, e.g. "chest tightness", "painful paper cut", "difficulty breathing and dizziness". Combine with previous note if present. Do NOT mention vitals.
+- healthCardSummary: write naturally, e.g. "Patient has asthma and is on metformin." or "Patient is allergic to penicillin." Do NOT use label prefixes like "Conditions:" or "Medications:". Null if nothing relevant or no health card.
 - rankedIds: ALL patient IDs ordered from highest to lowest priority.`;
 
   console.log(`[AI] ⏳ Sending request to Gemini for seat ${newRecord.seatNumber} (${allRecords.length} total patients)...`);

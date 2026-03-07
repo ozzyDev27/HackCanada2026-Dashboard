@@ -27,4 +27,3 @@ FILLER_PATIENTS = [
 for patient in FILLER_PATIENTS:
     res = requests.post(BASE_URL, json=patient)
     # print(f"Seat {patient['seatNumber']}: {res.status_code} {res.text}")
-
