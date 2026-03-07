@@ -1,13 +1,14 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
-import { addRecord, deleteRecord, getRecords, setHealthCardSummary, setRiskLevel, setSymptomSummary, updatePriorities } from "@/lib/store";
+import { addRecord, deleteRecord, getRecords, setHealthCardSummary, setRiskLevel, setSymptomSummary, updatePriorities, upsertRecord } from "@/lib/store";
 import healthCards from "@/lib/healthcards.json";
 
 // Single Gemini call that returns riskLevel + symptomSummary + healthCardSummary in one shot
 async function analyzePatient(
   id: string,
   record: { seatNumber: string | number; heartRate?: number; respiratoryRate?: number; bloodPressure?: string; symptoms?: string },
-  patientInfo?: { allergies: string[]; conditions: string[]; medications: string[] }
+  patientInfo?: { allergies: string[]; conditions: string[]; medications: string[] },
+  previousSymptoms?: string
 ) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
@@ -30,17 +31,18 @@ Medications: ${patientInfo.medications.join(", ") || "none"}`
 Patient vitals and symptoms:
 ${JSON.stringify(patientData, null, 2)}
 ${healthCardSection ? `\nHealth card:\n${healthCardSection}` : ""}
+${previousSymptoms ? `\nPrevious symptom note: "${previousSymptoms}"` : ""}
 
 Return exactly this JSON shape:
 {
   "riskLevel": "red" | "yellow" | "green",
-  "symptomSummary": "Patient has ... (plain English, under 20 words, or null if no symptoms)",
-  "healthCardSummary": "One sentence highlighting allergies/conditions/medications relevant to emergency care, under 20 words, or null if no health card"
+  "symptomSummary": "...",
+  "healthCardSummary": "...or null if no health card"
 }
 
 Rules:
 - riskLevel: red = immediate threat, yellow = urgent but stable, green = non-urgent. N/A vitals are not dangerous on their own.
-- symptomSummary: start with "Patient has", plain English, no jargon.
+- symptomSummary: plain English, no jargon, under 20 words. If there are previous symptoms, write a single sentence that combines old and new (e.g. "Patient had chest tightness and now also reports a severed finger"). Start with "Patient has" for new patients or "Patient had" when combining.
 - healthCardSummary: null if no health card data provided.`;
 
   const result = await model.generateContent(prompt);
@@ -108,7 +110,7 @@ export async function POST(request: Request) {
     const healthCardNumber = body.healthCardNumber ? String(body.healthCardNumber) : "";
     const patientInfo = healthCardNumber ? (healthCards.find((c) => c.healthCardNumber === healthCardNumber) ?? undefined) : undefined;
 
-    const newRecord = addRecord({
+    const { record: newRecord, previousSymptoms } = upsertRecord({
       seatNumber: body.seatNumber.toString(),
       heartRate: body.heartRate ? Number(body.heartRate) : undefined,
       respiratoryRate: body.respiratoryRate ? Number(body.respiratoryRate) : undefined,
@@ -119,7 +121,7 @@ export async function POST(request: Request) {
     });
 
     // Single combined Gemini call for per-patient analysis, plus re-ranking — both in background
-    analyzePatient(newRecord.id, newRecord, patientInfo).catch((err) =>
+    analyzePatient(newRecord.id, newRecord, patientInfo, previousSymptoms).catch((err) =>
       console.error("Gemini patient analysis failed:", err)
     );
     rerankPatients().catch((err) =>

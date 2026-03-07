@@ -24,6 +24,7 @@ export interface TriageRecord extends VitalSigns {
   riskLevel?: "red" | "yellow" | "green";
   symptomSummary?: string;
   healthCardSummary?: string;
+  previousSymptoms?: string;
   patientInfo?: PatientInfo;
 }
 
@@ -49,6 +50,39 @@ export function addRecord(record: Omit<TriageRecord, "id" | "timestamp">) {
   };
   triageRecords.unshift(newRecord);
   return newRecord;
+}
+
+// Upserts by seat number: if the seat already exists, update vitals and carry forward old symptoms.
+// Returns the record and whether it was an update (true) or a new insert (false).
+export function upsertRecord(
+  record: Omit<TriageRecord, "id" | "timestamp">
+): { record: TriageRecord; previousSymptoms?: string } {
+  const existing = triageRecords.find((r) => r.seatNumber === record.seatNumber);
+
+  if (existing) {
+    const previousSymptoms = existing.symptomSummary ?? existing.symptoms;
+    existing.heartRate = record.heartRate ?? existing.heartRate;
+    existing.respiratoryRate = record.respiratoryRate ?? existing.respiratoryRate;
+    existing.bloodPressure = record.bloodPressure ?? existing.bloodPressure;
+    existing.symptoms = record.symptoms ?? existing.symptoms;
+    existing.healthCardNumber = record.healthCardNumber ?? existing.healthCardNumber;
+    existing.patientInfo = record.patientInfo ?? existing.patientInfo;
+    existing.timestamp = new Date().toISOString();
+    // Clear stale AI results so the card shows fresh data
+    existing.riskLevel = undefined;
+    existing.symptomSummary = undefined;
+    existing.healthCardSummary = undefined;
+    existing.previousSymptoms = previousSymptoms;
+    return { record: existing, previousSymptoms };
+  }
+
+  const newRecord: TriageRecord = {
+    ...record,
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+  };
+  triageRecords.unshift(newRecord);
+  return { record: newRecord };
 }
 
 export function getRecords() {
