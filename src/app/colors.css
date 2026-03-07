@@ -1,0 +1,38 @@
+:root {
+  /* ── Page ─────────────────────────────── */
+  --page-bg:             #000000;
+  --page-text:           #ffffff;
+  --header-separator:    #9333ea; /* purple-600 */
+
+  /* ── Card ─────────────────────────────── */
+  --card-bg:             #1a1a1a;
+  --card-radius:         0.75rem; /* rounded-xl = 12px */
+
+  /* ── Risk band (top strip) ─────────────── */
+  --band-red:            #dc2626; /* red-600    */
+  --band-yellow:         #facc15; /* yellow-400 */
+  --band-green:          #22c55e; /* green-500  */
+  --band-pending:        #3f3f46; /* zinc-700   */
+
+  --band-text-light:     #ffffff;
+  --band-text-dark:      #000000; /* used on yellow band */
+
+  /* ── Vitals pills ──────────────────────── */
+  --pill-bg:             #2e2e2e;
+
+  /* ── Text ──────────────────────────────── */
+  --text-primary:        #ffffff;
+  --text-secondary:      #d4d4d8; /* zinc-300 */
+  --text-muted:          #71717a; /* zinc-500 */
+
+  /* ── Buttons ───────────────────────────── */
+  --btn-primary-bg:      #7dd3fc; /* sky-300  – light blue */
+  --btn-primary-hover:   #bae6fd; /* sky-200  */
+  --btn-primary-active:  #38bdf8; /* sky-400  */
+  --btn-primary-text:    #000000;
+
+  /* ── Filter legend ─────────────────────── */
+  --filter-green:        #4ade80; /* green-400 */
+  --filter-yellow:       #facc15; /* yellow-400 */
+  --filter-red:          #f87171; /* red-400   */
+}

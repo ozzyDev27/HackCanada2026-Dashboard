@@ -10,9 +10,9 @@ export interface PatientInfo {
 
 export interface VitalSigns {
   seatNumber: string;
-  heartRate: number;
-  respiratoryRate: number;
-  bloodPressure: string;
+  heartRate?: number;
+  respiratoryRate?: number;
+  bloodPressure?: string;
   symptoms?: string;
   healthCardNumber: string;
 }
@@ -22,6 +22,8 @@ export interface TriageRecord extends VitalSigns {
   timestamp: string;
   priorityRank?: number;
   riskLevel?: "red" | "yellow" | "green";
+  symptomSummary?: string;
+  healthCardSummary?: string;
   patientInfo?: PatientInfo;
 }
 
@@ -72,4 +74,14 @@ export function deleteRecord(id: string): boolean {
 export function setRiskLevel(id: string, level: "red" | "yellow" | "green") {
   const record = triageRecords.find((r) => r.id === id);
   if (record) record.riskLevel = level;
+}
+
+export function setSymptomSummary(id: string, summary: string) {
+  const record = triageRecords.find((r) => r.id === id);
+  if (record) record.symptomSummary = summary;
+}
+
+export function setHealthCardSummary(id: string, summary: string) {
+  const record = triageRecords.find((r) => r.id === id);
+  if (record) record.healthCardSummary = summary;
 }

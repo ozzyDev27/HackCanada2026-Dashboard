@@ -1,9 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
-import { addRecord, deleteRecord, getRecords, setRiskLevel, updatePriorities } from "@/lib/store";
+import { addRecord, deleteRecord, getRecords, setHealthCardSummary, setRiskLevel, setSymptomSummary, updatePriorities } from "@/lib/store";
 import healthCards from "@/lib/healthcards.json";
 
-async function assessRisk(id: string, record: { seatNumber: string | number; heartRate: number; respiratoryRate: number; bloodPressure: string; symptoms?: string }) {
+async function assessRisk(id: string, record: { seatNumber: string | number; heartRate?: number; respiratoryRate?: number; bloodPressure?: string; symptoms?: string }) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -23,6 +23,34 @@ Respond with ONLY one word: red, yellow, or green. No punctuation, no explanatio
   const text = result.response.text().trim().toLowerCase();
   const level = ["red", "yellow", "green"].includes(text) ? (text as "red" | "yellow" | "green") : "yellow";
   setRiskLevel(id, level);
+}
+
+async function summarizeSymptoms(id: string, symptoms: string) {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const prompt = `You are a medical scribe. A patient described their symptoms in their own words. Rewrite it as a concise, clinical one-sentence summary suitable for a triage card. Keep it under 15 words. No quotes, no punctuation at the end.
+
+Patient's words: "${symptoms}"`;
+
+  const result = await model.generateContent(prompt);
+  const summary = result.response.text().trim();
+  setSymptomSummary(id, summary);
+}
+
+async function summarizeHealthCard(id: string, patientInfo: { allergies: string[]; conditions: string[]; medications: string[] }) {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const prompt = `You are a medical scribe. Summarize the following patient health record into one concise clinical sentence for a triage card. Highlight anything relevant to emergency care (allergies, serious conditions, key medications). Keep it under 20 words. No quotes, no punctuation at the end.
+
+Allergies: ${patientInfo.allergies.join(", ") || "none"}
+Conditions: ${patientInfo.conditions.join(", ") || "none"}
+Medications: ${patientInfo.medications.join(", ") || "none"}`;
+
+  const result = await model.generateContent(prompt);
+  const summary = result.response.text().trim();
+  setHealthCardSummary(id, summary);
 }
 
 async function rerankPatients() {
@@ -62,7 +90,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    if (!body.seatNumber || !body.heartRate || !body.respiratoryRate || !body.bloodPressure) {
+    if (!body.seatNumber) {
       return NextResponse.json(
         { error: "mmm uh oh" },
         { status: 400 }
@@ -74,19 +102,27 @@ export async function POST(request: Request) {
 
     const newRecord = addRecord({
       seatNumber: body.seatNumber.toString(),
-      heartRate: Number(body.heartRate),
-      respiratoryRate: Number(body.respiratoryRate),
-      bloodPressure: body.bloodPressure.toString(),
+      heartRate: body.heartRate !== undefined ? Number(body.heartRate) : undefined,
+      respiratoryRate: body.respiratoryRate !== undefined ? Number(body.respiratoryRate) : undefined,
+      bloodPressure: body.bloodPressure ? body.bloodPressure.toString() : undefined,
       symptoms: body.symptoms ? body.symptoms.toString() : undefined,
       healthCardNumber,
       patientInfo,
     });
 
-    // Assess risk and re-rank all patients with Gemini in the background
+    // Assess risk, summarize symptoms, and re-rank all patients with Gemini in the background
     assessRisk(newRecord.id, newRecord).catch((err) =>
       console.error("Gemini risk assessment failed:", err)
     );
-    rerankPatients().catch((err) =>
+    if (newRecord.symptoms) {
+      summarizeSymptoms(newRecord.id, newRecord.symptoms).catch((err) =>
+        console.error("Gemini symptom summary failed:", err)
+      );
+    }    if (patientInfo) {
+      summarizeHealthCard(newRecord.id, patientInfo).catch((err) =>
+        console.error("Gemini health card summary failed:", err)
+      );
+    }    rerankPatients().catch((err) =>
       console.error("Gemini re-ranking failed:", err)
     );
 

@@ -11,14 +11,16 @@ interface PatientInfo {
 interface TriageCardProps {
   id: string;
   seatNumber: number;
-  heartRate: number;
-  respiratoryRate: number;
-  bloodPressure: string;
+  heartRate?: number;
+  respiratoryRate?: number;
+  bloodPressure?: string;
   symptoms?: string;
+  symptomSummary?: string;
   timestamp: string;
   priorityRank?: number;
   riskLevel?: "red" | "yellow" | "green";
   patientInfo?: PatientInfo;
+  healthCardSummary?: string;
   onDismiss?: () => void;
 }
 
@@ -28,160 +30,110 @@ export default function TriageCard({
   respiratoryRate,
   bloodPressure,
   symptoms,
+  symptomSummary,
   timestamp,
   priorityRank,
   riskLevel,
   patientInfo,
+  healthCardSummary,
   onDismiss,
 }: TriageCardProps) {
-  const cardStyles = {
-    red: "border-red-300 bg-red-50/60 dark:border-red-900/60 dark:bg-red-950/25",
-    yellow: "border-yellow-300 bg-yellow-50/60 dark:border-yellow-800/60 dark:bg-yellow-950/25",
-    green: "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20",
-    pending: "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900",
+  const bandColor: Record<string, string> = {
+    red:     "var(--band-red)",
+    yellow:  "var(--band-yellow)",
+    green:   "var(--band-green)",
+    pending: "var(--band-pending)",
   };
-  const barStyles = {
-    red: "bg-red-500",
-    yellow: "bg-yellow-400",
-    green: "bg-emerald-500",
-    pending: "bg-zinc-300 dark:bg-zinc-700",
-  };
+  const bandText = riskLevel === "yellow" ? "#000000" : "#ffffff";
   const styleKey = riskLevel ?? "pending";
 
+  const topLabel = priorityRank !== undefined ? `#${priorityRank}` : "Ranking…";
+
+  const timeStr = new Date(timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const notes: string[] = [];
+  if (patientInfo) {
+    if (patientInfo.allergies.length > 0)
+      notes.push(`Allergy: ${patientInfo.allergies.join(", ")}`);
+    if (patientInfo.medications.length > 0)
+      notes.push(`Medication: ${patientInfo.medications.join(", ")}`);
+    if (patientInfo.conditions.length > 0)
+      notes.push(`Condition: ${patientInfo.conditions.join(", ")}`);
+  }
+
   return (
-    <div
-      className={`relative flex flex-col overflow-hidden rounded-2xl border p-6 shadow-sm transition-all hover:shadow-md ${cardStyles[styleKey]}`}
-    >
-      {/* Accent Top Bar */}
-      <div className={`absolute inset-x-0 top-0 h-1 ${barStyles[styleKey]}`} />
+    <div className="flex flex-col overflow-hidden rounded-xl" style={{ backgroundColor: "var(--card-bg)" }}>
+      {/* Coloured top band */}
+      <div
+        className="flex items-center justify-between px-3 py-2"
+        style={{ backgroundColor: bandColor[styleKey] }}
+      >
+        <span className="text-sm font-bold" style={{ color: bandText }}>{topLabel}</span>
+        <span className="text-sm font-semibold" style={{ color: bandText }}>{timeStr}</span>
+      </div>
 
-      {/* Dismiss Button */}
-      {onDismiss && (
-        <button
-          onClick={onDismiss}
-          className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-          aria-label="Dismiss patient"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
-        </button>
-      )}
+      {/* Body */}
+      <div className="flex flex-1 flex-col gap-3 px-4 pt-4 pb-4">
+        {/* Seat */}
+        <p className="text-white">
+          <span className="text-base font-bold">Seat number: </span>
+          <span className="text-3xl font-bold">{seatNumber}</span>
+        </p>
 
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            Seat / Patient Location
-          </h3>
-          <p className="mt-1 text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {seatNumber}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          {priorityRank !== undefined ? (
-            <span
-              className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-bold tracking-wide ${
-                priorityRank === 1
-                  ? "bg-red-600 text-white"
-                  : priorityRank === 2
-                  ? "bg-orange-500 text-white"
-                  : priorityRank === 3
-                  ? "bg-yellow-400 text-zinc-900"
-                  : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200"
-              }`}
-            >
-              #{priorityRank} Priority
-            </span>
-          ) : (
-            <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-400 dark:bg-zinc-800">
-              Ranking…
-            </span>
-          )}
-          <div className="text-right">
-            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-500">
-              Recorded At
-            </p>
-            <p className="mt-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {new Date(timestamp).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </p>
+        {/* Vitals */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between rounded-full px-4 py-1.5" style={{ backgroundColor: "var(--pill-bg)" }}>
+            <span className="text-sm font-semibold text-white">Heart Rate</span>
+            <span className="text-sm font-semibold text-white">{heartRate ?? "???"} <span className="font-normal">bpm</span></span>
+          </div>
+          <div className="flex items-center justify-between rounded-full px-4 py-1.5" style={{ backgroundColor: "var(--pill-bg)" }}>
+            <span className="text-sm  font-semibold text-white">Resp. Rate</span>
+            <span className="text-sm font-semibold text-white">{respiratoryRate ?? "???"}<span className="font-normal">/min</span></span>
+          </div>
+          <div className="flex items-center justify-between rounded-full px-4 py-1.5" style={{ backgroundColor: "var(--pill-bg)" }}>
+            <span className="text-sm font-semibold text-white">Blood Pressure</span>
+            <span className="text-sm font-semibold text-white">{bloodPressure ?? "???"}</span>
           </div>
         </div>
+
+        {/* Symptoms */}
+        <div>
+          <p className="mb-0.5 text-sm font-bold text-white">Reported symptoms</p>
+          <p className="text-sm text-zinc-300">{symptomSummary ?? symptoms ?? "None reported"}</p>
+        </div>
+
+        {/* Health Card Notes */}
+        <div>
+          <p className="mb-0.5 text-sm font-bold text-white">Health Card Notes</p>
+          {healthCardSummary ? (
+            <p className="text-sm text-zinc-300">{healthCardSummary}</p>
+          ) : notes.length > 0 ? (
+            notes.map((note, i) => (
+              <p key={i} className="text-sm text-zinc-300">{note}</p>
+            ))
+          ) : (
+            <p className="text-sm italic text-zinc-500">No health card on file</p>
+          )}
+        </div>
+
+        {/* Send to doctor */}
+        <button
+          onClick={onDismiss}
+          className="mt-auto w-full rounded-xl py-2.5 text-sm font-bold transition"
+          style={{
+            backgroundColor: "var(--btn-primary-bg)",
+            color: "var(--btn-primary-text)",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.backgroundColor = "var(--btn-primary-hover)")}
+          onMouseLeave={e => (e.currentTarget.style.backgroundColor = "var(--btn-primary-bg)")}
+          onMouseDown={e => (e.currentTarget.style.backgroundColor = "var(--btn-primary-active)")}
+        >
+          Send to doctor
+        </button>
       </div>
-
-      <div className="my-4 flex flex-col gap-2">
-        <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-2 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800/50">
-          <span className="text-xs font-medium tracking-wider text-zinc-500">
-            Heart Rate
-          </span>
-          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            {heartRate} <span className="text-xs font-normal text-zinc-500">bpm</span>
-          </span>
-        </div>
-        <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-2 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800/50">
-          <span className="text-xs font-medium tracking-wider text-zinc-500">
-            Resp. Rate
-          </span>
-          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            {respiratoryRate} <span className="text-xs font-normal text-zinc-500">/min</span>
-          </span>
-        </div>
-        <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-2 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800/50">
-          <span className="text-xs font-medium tracking-wider text-zinc-500">
-            Blood Pressure
-          </span>
-          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            {bloodPressure} <span className="text-xs font-normal text-zinc-500">mmHg</span>
-          </span>
-        </div>
-      </div>
-
-      {symptoms && (
-        <div className="mt-2 rounded-xl border border-zinc-100 bg-zinc-50/50 p-3 dark:border-zinc-800/50 dark:bg-zinc-800/30">
-          <h4 className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-1">
-            Reported Symptoms
-          </h4>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-2">
-            {symptoms}
-          </p>
-        </div>
-      )}
-
-      {patientInfo ? (
-        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
-          <h4 className="text-xs font-medium uppercase tracking-wider text-blue-500 dark:text-blue-400 mb-2">
-            Health Card #{patientInfo.healthCardNumber}
-          </h4>
-          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{patientInfo.name}</p>
-          <p className="text-xs text-zinc-500 mb-2">
-            DOB: {new Date(patientInfo.dob).toLocaleDateString()} &middot; Blood Type: {patientInfo.bloodType}
-          </p>
-          {patientInfo.conditions.length > 0 && (
-            <div className="mb-1">
-              <span className="text-xs font-medium text-zinc-500">Conditions: </span>
-              <span className="text-xs text-zinc-700 dark:text-zinc-300">{patientInfo.conditions.join(", ")}</span>
-            </div>
-          )}
-          {patientInfo.allergies.length > 0 && (
-            <div className="mb-1">
-              <span className="text-xs font-medium text-red-500">Allergies: </span>
-              <span className="text-xs text-zinc-700 dark:text-zinc-300">{patientInfo.allergies.join(", ")}</span>
-            </div>
-          )}
-          {patientInfo.medications.length > 0 && (
-            <div>
-              <span className="text-xs font-medium text-zinc-500">Medications: </span>
-              <span className="text-xs text-zinc-700 dark:text-zinc-300">{patientInfo.medications.join(", ")}</span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50/50 p-3 dark:border-zinc-800/50 dark:bg-zinc-800/20">
-          <p className="text-xs text-zinc-400 dark:text-zinc-500 italic">No health card on file</p>
-        </div>
-      )}
     </div>
   );
 }

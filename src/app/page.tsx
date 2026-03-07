@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import TriageCard from "@/components/TriageCard";
 
 interface PatientInfo {
@@ -20,6 +21,8 @@ interface TriageRecord {
   respiratoryRate: number;
   bloodPressure: string;
   symptoms?: string;
+  symptomSummary?: string;
+  healthCardSummary?: string;
   timestamp: string;
   priorityRank?: number;
   riskLevel?: "red" | "yellow" | "green";
@@ -29,6 +32,8 @@ interface TriageRecord {
 export default function Home() {
   const [records, setRecords] = useState<TriageRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clock, setClock] = useState("");
+  const [filters, setFilters] = useState({ red: true, yellow: true, green: true });
 
   const dismissRecord = async (id: string) => {
     setRecords((prev) => prev.filter((r) => r.id !== id));
@@ -39,13 +44,12 @@ export default function Home() {
     }
   };
 
+
   const fetchRecords = async () => {
     try {
       const res = await fetch("/api/triage");
       const data = await res.json();
-      if (data.records) {
-        setRecords(data.records);
-      }
+      if (data.records) setRecords(data.records);
     } catch (err) {
       console.error("Failed to fetch triage records:", err);
     } finally {
@@ -55,88 +59,127 @@ export default function Home() {
 
   useEffect(() => {
     fetchRecords();
-    const intervalId = setInterval(fetchRecords, 5000);
-    return () => clearInterval(intervalId);
+    const pollId = setInterval(fetchRecords, 5000);
+    return () => clearInterval(pollId);
   }, []);
 
+  useEffect(() => {
+    const tick = () =>
+      setClock(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const toggleFilter = (key: "red" | "yellow" | "green") =>
+    setFilters((f) => ({ ...f, [key]: !f[key] }));
+
+  const sorted = [...records]
+    .sort((a, b) => {
+      if (a.priorityRank === undefined && b.priorityRank === undefined) return 0;
+      if (a.priorityRank === undefined) return 1;
+      if (b.priorityRank === undefined) return -1;
+      return a.priorityRank - b.priorityRank;
+    })
+    .filter((r) => {
+      if (r.riskLevel === "red") return filters.red;
+      if (r.riskLevel === "yellow") return filters.yellow;
+      if (r.riskLevel === "green") return filters.green;
+      return true; // pending always shown
+    });
+
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100">
+    <div className="min-h-screen bg-black text-white">
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 px-6 py-4 backdrop-blur-lg dark:border-zinc-800 dark:bg-zinc-950/80">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Triage Dashboard</h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Live patient vitals monitoring
-            </p>
-          </div>
+      <header className="flex items-center justify-between px-8 py-5">
+        <div className="text-sm text-zinc-400 leading-snug">
+          <p>space save</p>
+          <p>for logo</p>
+        </div>
+
+        <p className="text-6xl font-bold tracking-tight">{clock}</p>
+
+        <div className="flex flex-col gap-1.5 text-sm font-semibold">
+          <label className="flex cursor-pointer items-center justify-end gap-2">
+            <span style={{ color: "var(--filter-green)" }}>Low risk</span>
+            <input
+              type="checkbox"
+              checked={filters.green}
+              onChange={() => toggleFilter("green")}
+              className="h-4 w-4"
+            />
+          </label>
+          <label className="flex cursor-pointer items-center justify-end gap-2">
+            <span style={{ color: "var(--filter-yellow)" }}>Moderate danger</span>
+            <input
+              type="checkbox"
+              checked={filters.yellow}
+              onChange={() => toggleFilter("yellow")}
+              className="h-4 w-4"
+            />
+          </label>
+          <label className="flex cursor-pointer items-center justify-end gap-2">
+            <span style={{ color: "var(--filter-red)" }}>Urgent Care</span>
+            <input
+              type="checkbox"
+              checked={filters.red}
+              onChange={() => toggleFilter("red")}
+              className="h-4 w-4"
+            />
+          </label>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-8 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Incoming Patients</h2>
-          <span className="rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
-            {records.length} total
-          </span>
-        </div>
+      {/* Purple separator */}
+      <div className="h-1" style={{ backgroundColor: "var(--header-separator)" }} />
 
+      {/* Cards */}
+      <main className="px-6 py-8">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-zinc-900 dark:border-zinc-800 dark:border-t-zinc-100" />
-            <p className="mt-4 text-sm text-zinc-500">Loading patient data...</p>
+          <div className="flex items-center justify-center py-20">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-white" />
           </div>
-        ) : records.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50/50 py-32 dark:border-zinc-800 dark:bg-zinc-900/50">
-            <div className="mb-4 rounded-full bg-white p-4 shadow-sm dark:bg-zinc-900">
-              <svg
-                className="h-8 w-8 text-zinc-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium">No patients waiting</h3>
-            <p className="mt-1 text-sm text-zinc-500">
-              New triage records will appear here automatically.
-            </p>
+        ) : sorted.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-32 text-zinc-500">
+            <p className="text-lg font-medium">No patients waiting</p>
+            <p className="mt-1 text-sm">New triage records will appear here automatically.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {[...records]
-              .sort((a, b) => {
-                if (a.priorityRank === undefined && b.priorityRank === undefined) return 0;
-                if (a.priorityRank === undefined) return 1;
-                if (b.priorityRank === undefined) return -1;
-                return a.priorityRank - b.priorityRank;
-              })
-              .map((record) => (
-              <TriageCard
-                key={record.id}
-                id={record.id}
-                seatNumber={record.seatNumber}
-                heartRate={record.heartRate}
-                respiratoryRate={record.respiratoryRate}
-                bloodPressure={record.bloodPressure}
-                symptoms={record.symptoms}
-                timestamp={record.timestamp}
-                priorityRank={record.priorityRank}
-                riskLevel={record.riskLevel}
-                patientInfo={record.patientInfo}
-                onDismiss={() => dismissRecord(record.id)}
-              />
-            ))}
-          </div>
+          <AnimatePresence mode="popLayout">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              {sorted.map((record) => (
+                <motion.div
+                  key={record.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.75, transition: { duration: 0.25, ease: "easeIn" } }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                >
+                  <TriageCard
+                    key={record.id}
+                    id={record.id}
+                    seatNumber={record.seatNumber}
+                    heartRate={record.heartRate}
+                    respiratoryRate={record.respiratoryRate}
+                    bloodPressure={record.bloodPressure}
+                    symptoms={record.symptoms}
+                    symptomSummary={record.symptomSummary}
+                    healthCardSummary={record.healthCardSummary}
+                    timestamp={record.timestamp}
+                    priorityRank={record.priorityRank}
+                    riskLevel={record.riskLevel}
+                    patientInfo={record.patientInfo}
+                    onDismiss={() => dismissRecord(record.id)}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </AnimatePresence>
         )}
       </main>
     </div>
   );
 }
+
+

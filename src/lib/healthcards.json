@@ -1,11 +1,29 @@
 [
   {
-    "healthCardNumber": "1221",
+    "healthCardNumber": "1221-ED",
     "name": "Jamie Peacock",
     "dob": "2009-01-06",
     "bloodType": "A+",
-    "allergies": ["Peanut"],
-    "conditions": ["Asthma", "Scoliosis"],
+    "allergies": ["Penicillin"],
+    "conditions": ["Cancer", "Scoliosis"],
+    "medications": []
+  },
+  {
+    "healthCardNumber": "1222-ED",
+    "name": "Jenny Jin",
+    "dob": "2005-03-30",
+    "bloodType": "B+",
+    "allergies": [],
+    "conditions": ["Asthma"],
     "medications": ["Atorvastatin", "Lisinopril"]
+  },
+  {
+    "healthCardNumber": "1223-ED",
+    "name": "Ahana Virmani",
+    "dob": "2001-02-22",
+    "bloodType": "B-",
+    "allergies": [],
+    "conditions": ["Anxiety Disorder"],
+    "medications": []
   }
 ]
