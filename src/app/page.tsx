@@ -94,10 +94,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-black text-white">
       <header className="flex items-center justify-between px-8 py-5">
-        <div className="text-sm text-zinc-400 leading-snug">
-          <p>space save</p>
-          <p>for logo</p>
-        </div>
+        <img src="/Blue Modern Mobile Application Presentation (1).png" alt="Logo" className="w-auto" style={{ height: "120px", marginTop: "-16px", marginBottom: "-16px" }} />
 
         <p className="text-6xl font-bold tracking-tight">{clock}</p>
 
