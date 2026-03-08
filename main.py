@@ -40,4 +40,4 @@ b={
         "healthCardNumber": "6561-964-179-ED",
         "timeOffset": 0,
     }
-res = requests.post(BASE_URL, json=a)
+res = requests.post(BASE_URL, json=x)

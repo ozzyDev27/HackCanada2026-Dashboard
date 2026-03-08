@@ -106,6 +106,7 @@ export async function DELETE(request: Request) {
     if (!removed) {
       return NextResponse.json({ error: "Record not found" }, { status: 404 });
     }
+    rankPatients();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(error);
