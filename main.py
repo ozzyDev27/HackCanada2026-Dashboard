@@ -1,6 +1,7 @@
 import requests
 
 BASE_URL = "http://localhost:3000/api/triage"
+# BASE_URL = "https://hack-canada2026-dashboard.vercel.app/api/triage"
 
 FILLER_PATIENTS = [
     {

@@ -37,29 +37,16 @@ Medications: ${patientInfo.medications.join(", ") || "none"}`
       symptoms: r.symptoms || "none reported",
     }));
 
-  const prompt = `You are a triage nurse. Be brief. Respond with ONLY a valid JSON object — no markdown, no explanation.
+  const prompt = `Triage nurse. JSON only.
 
-New patient (id: "${newId}"):
-${JSON.stringify(newPatientData, null, 2)}
-${healthCardSection ? `\nHealth card:\n${healthCardSection}` : ""}
-${previousSymptoms ? `\nPrevious note: "${previousSymptoms}"` : ""}
+New patient id="${newId}": ${JSON.stringify(newPatientData)}
+${healthCardSection ? `Health card: ${healthCardSection}` : ""}
+${previousSymptoms ? `Previous: ${previousSymptoms}` : ""}
 
-All current patients (including new):
-${JSON.stringify([{ id: newId, ...newPatientData }, ...otherPatients], null, 2)}
+All patients: ${JSON.stringify([{ id: newId, ...newPatientData }, ...otherPatients])}
 
-Return exactly this JSON:
-{
-  "riskLevel": "red" | "yellow" | "green",
-  "symptomSummary": "...",
-  "healthCardSummary": "...or null",
-  "rankedIds": ["id-highest-priority", "id-next", ...]
-}
-
-Rules:
-- riskLevel: red = immediate threat, yellow = urgent but stable, green = non-urgent. N/A vitals are not dangerous on their own.
-- symptomSummary: a short symptom phrase, NOT a full sentence. No subject, no "patient complains of", no "presents with". Just the symptom itself, e.g. "chest tightness", "painful paper cut", "difficulty breathing and dizziness". Combine with previous note if present. Do NOT mention vitals.
-- healthCardSummary: write naturally, e.g. "Patient has asthma and is on metformin." or "Patient is allergic to penicillin." Do NOT use label prefixes like "Conditions:" or "Medications:". Null if nothing relevant or no health card.
-- rankedIds: ALL patient IDs ordered from highest to lowest priority.`;
+Return: {"riskLevel":"red"|"yellow"|"green","symptomSummary":"<bare phrase, no vitals, e.g. chest tightness>","healthCardSummary":"<natural sentence or null>","rankedIds":["<highest priority id>",...]}
+red=immediate threat, yellow=urgent, green=minor. N/A vitals alone are not dangerous. rankedIds must include ALL patient ids.`;
 
   console.log(`[AI] ⏳ Sending request to Gemini for seat ${newRecord.seatNumber} (${allRecords.length} total patients)...`);
   const t0 = Date.now();
@@ -70,8 +57,7 @@ Rules:
   console.log(`[AI] ✅ Gemini responded in ${Date.now() - t0}ms`);
 
   const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("Gemini did not return valid JSON");
-
+  if (!match) throw new Error("bad response");
   const parsed = JSON.parse(match[0]);
 
   console.log(`[AI] risk=${parsed.riskLevel} | summary="${parsed.symptomSummary}" | ranked=${JSON.stringify(parsed.rankedIds)}`);
