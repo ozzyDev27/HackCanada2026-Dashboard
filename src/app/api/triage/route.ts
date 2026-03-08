@@ -106,13 +106,13 @@ export async function POST(request: Request) {
     const forcedRisk = Math.abs(timeOffset) === 5 ? "yellow" : Math.abs(timeOffset) === 9 ? "green" : null;
     if (forcedRisk) {
       setRiskLevel(newRecord.id, forcedRisk);
-      if (Math.abs(timeOffset) === 5) {
-        setSymptomSummary(newRecord.id, "chest tightness");
-        setHealthCardSummary(newRecord.id, "Patient has an anxiety disorder.");
-      } else if (Math.abs(timeOffset) === 9) {
-        setSymptomSummary(newRecord.id, "minor paper cut");
-        setHealthCardSummary(newRecord.id, "Patient has asthma and is on Atorvastatin and Lisinopril.");
-      }
+      // if (Math.abs(timeOffset) === 5) {
+      //   setSymptomSummary(newRecord.id, "chest tightness");
+      //   setHealthCardSummary(newRecord.id, "Patient has an anxiety disorder.");
+      // } else if (Math.abs(timeOffset) === 9) {
+      //   setSymptomSummary(newRecord.id, "minor paper cut");
+      //   setHealthCardSummary(newRecord.id, "Patient has asthma and is on Atorvastatin and Lisinopril.");
+      // }
       rankPatients().catch(console.error);
     } else {
       classifyPatient(newRecord.id, newRecord, patientInfo, previousSymptoms).then(() => rankPatients()).catch(console.error);
