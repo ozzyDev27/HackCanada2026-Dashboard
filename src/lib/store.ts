@@ -21,6 +21,7 @@ export interface TriageRecord extends VitalSigns {
   id: string;
   timestamp: string;
   priorityRank?: number;
+  priorityScore?: number;
   riskLevel?: "red" | "yellow" | "green";
   symptomSummary?: string;
   healthCardSummary?: string;
@@ -58,6 +59,7 @@ export function upsertRecord(
     existing.patientInfo = record.patientInfo ?? existing.patientInfo;
     existing.timestamp = timestamp ?? new Date().toISOString();
     existing.riskLevel = undefined;
+    existing.priorityScore = undefined;
     existing.symptomSummary = undefined;
     existing.healthCardSummary = undefined;
     existing.previousSymptoms = previousSymptoms;
@@ -96,6 +98,11 @@ export function deleteRecord(id: string): boolean {
 export function setRiskLevel(id: string, level: "red" | "yellow" | "green") {
   const record = triageRecords.find((r) => r.id === id);
   if (record) record.riskLevel = level;
+}
+
+export function setPriorityScore(id: string, score: number) {
+  const record = triageRecords.find((r) => r.id === id);
+  if (record) record.priorityScore = score;
 }
 
 export function setSymptomSummary(id: string, summary: string) {

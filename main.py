@@ -1,10 +1,9 @@
 import requests
 
 BASE_URL = "http://localhost:3000/api/triage"
-BASE_URL = "https://hack-canada2026-dashboard.vercel.app/api/triage"
+# BASE_URL = "https://hack-canada2026-dashboard.vercel.app/api/triage"
 
-FILLER_PATIENTS = [
-    {
+x={
         "seatNumber": 12,
         "heartRate": 90,
         "respiratoryRate": 25,
@@ -12,17 +11,16 @@ FILLER_PATIENTS = [
         "symptoms": "Burned hand on stove",
         "healthCardNumber": "1223-ED",
         "timeOffset": -5,
-    },
-    {
-        "seatNumber": 7,
-        "heartRate": 90,
-        "respiratoryRate": 20,
-        "bloodPressure": "130/90",
-        "symptoms": "Paper cut on hand",
-        "healthCardNumber": "1221-ED",
-        "timeOffset": -9,
-    },
-]
+    }
+y={
+    "seatNumber": 7,
+    "heartRate": 90,
+    "respiratoryRate": 20,
+    "bloodPressure": "130/90",
+    "symptoms": "Paper cut on hand",
+    "healthCardNumber": "1221-ED",
+    "timeOffset": -9,
+}
 
 a={
         "seatNumber": 4,
@@ -42,9 +40,4 @@ b={
         "healthCardNumber": "6561-964-179-ED",
         "timeOffset": 0,
     }
-# res = requests.post(BASE_URL, json=b)
-
-
-for patient in FILLER_PATIENTS:
-    res = requests.post(BASE_URL, json=patient)
-    print(f"Seat {patient['seatNumber']}: {res.status_code} {res.text}")
+res = requests.post(BASE_URL, json=a)

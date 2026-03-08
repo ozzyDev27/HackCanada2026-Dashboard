@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
-import { addRecord, deleteRecord, getRecords, setHealthCardSummary, setRiskLevel, setSymptomSummary, updatePriorities, upsertRecord } from "@/lib/store";
+import { deleteRecord, getRecords, setHealthCardSummary, setPriorityScore, setRiskLevel, setSymptomSummary, updatePriorities, upsertRecord } from "@/lib/store";
 import healthCards from "@/lib/healthcards.json";
 
 async function classifyPatient(
@@ -23,57 +23,36 @@ async function classifyPatient(
 
   const prompt = `Triage nurse. JSON only. Single patient.
 Vitals: ${JSON.stringify(vitals)}${hc ? `\nHealth card: ${hc}` : ""}${previousSymptoms ? `\nPrevious: ${previousSymptoms}` : ""}
-Return: {"riskLevel":"red"|"yellow"|"green","symptomSummary":"<bare symptom phrase, no vitals>","healthCardSummary":"<natural sentence or null>"}
-red=immediate threat, yellow=urgent, green=minor.`;
+Return: {"score":<1-10>,"symptomSummary":"<bare symptom phrase, no vitals>","healthCardSummary":"<natural sentence or null>"}
+Score: 1=critical emergency, 10=completely trivial. 1-3=red, 4-6=yellow, 7-10=green.`;
 
   console.log(`[AI] classify seat ${record.seatNumber}...`);
   const t0 = Date.now();
-  const result = await model.generateContent({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { thinkingConfig: { thinkingBudget: 0 } } as never,
-  });
+  const result = await model.generateContent(prompt);
   console.log(`[AI] classify done in ${Date.now() - t0}ms`);
 
   const match = result.response.text().match(/\{[\s\S]*\}/);
   if (!match) throw new Error("bad response");
   const parsed = JSON.parse(match[0]);
 
-  if (["red", "yellow", "green"].includes(parsed.riskLevel)) setRiskLevel(id, parsed.riskLevel);
+  const score = Number(parsed.score);
+  if (score >= 1 && score <= 10) {
+    setPriorityScore(id, score);
+    setRiskLevel(id, score <= 3 ? "red" : score <= 6 ? "yellow" : "green");
+  }
   if (parsed.symptomSummary) setSymptomSummary(id, parsed.symptomSummary);
   if (parsed.healthCardSummary) setHealthCardSummary(id, parsed.healthCardSummary);
 }
 
-async function rankPatients() {
+function rankPatients() {
+  const fallback: Record<string, number> = { red: 3, yellow: 6, green: 9 };
   const all = getRecords();
-  if (all.length < 2) return;
-
-  const model = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!).getGenerativeModel({ model: "gemini-2.5-flash" });
-
-  const patients = all.map((r) => ({
-    id: r.id,
-    heartRate: r.heartRate ?? "N/A",
-    respiratoryRate: r.respiratoryRate ?? "N/A",
-    bloodPressure: r.bloodPressure ?? "N/A",
-    symptoms: r.symptoms || "none",
-    riskLevel: r.riskLevel ?? "unknown",
-  }));
-
-  const prompt = `Triage nurse. Return ONLY a JSON array of patient IDs ordered highest to lowest priority.
-Patients: ${JSON.stringify(patients)}
-Return: ["id1","id2",...]`;
-
-  console.log(`[AI] rank ${all.length} patients...`);
-  const t0 = Date.now();
-  const result = await model.generateContent({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { thinkingConfig: { thinkingBudget: 0 } } as never,
+  const ranked = [...all].sort((a, b) => {
+    const pa = a.priorityScore ?? fallback[a.riskLevel ?? ""] ?? 10;
+    const pb = b.priorityScore ?? fallback[b.riskLevel ?? ""] ?? 10;
+    return pa - pb;
   });
-  console.log(`[AI] rank done in ${Date.now() - t0}ms`);
-
-  const match = result.response.text().match(/\[[\s\S]*\]/);
-  if (!match) throw new Error("bad response");
-  const rankedIds: string[] = JSON.parse(match[0]);
-  if (Array.isArray(rankedIds) && rankedIds.length > 0) updatePriorities(rankedIds);
+  updatePriorities(ranked.map((r) => r.id));
 }
 
 export async function POST(request: Request) {
