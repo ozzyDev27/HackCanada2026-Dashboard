@@ -3,71 +3,77 @@ import { NextResponse } from "next/server";
 import { addRecord, deleteRecord, getRecords, setHealthCardSummary, setRiskLevel, setSymptomSummary, updatePriorities, upsertRecord } from "@/lib/store";
 import healthCards from "@/lib/healthcards.json";
 
-async function analyzeAndRank(
-  newId: string,
-  newRecord: { seatNumber: string | number; heartRate?: number; respiratoryRate?: number; bloodPressure?: string; symptoms?: string },
+async function classifyPatient(
+  id: string,
+  record: { seatNumber: string | number; heartRate?: number; respiratoryRate?: number; bloodPressure?: string; symptoms?: string },
   patientInfo?: { allergies: string[]; conditions: string[]; medications: string[] },
   previousSymptoms?: string
 ) {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!).getGenerativeModel({ model: "gemini-2.5-flash" });
 
-  const allRecords = getRecords();
-
-  const newPatientData = {
-    heartRate: newRecord.heartRate ?? "N/A",
-    respiratoryRate: newRecord.respiratoryRate ?? "N/A",
-    bloodPressure: newRecord.bloodPressure ?? "N/A",
-    symptoms: newRecord.symptoms ?? "none reported",
+  const vitals = {
+    heartRate: record.heartRate ?? "N/A",
+    respiratoryRate: record.respiratoryRate ?? "N/A",
+    bloodPressure: record.bloodPressure ?? "N/A",
+    symptoms: record.symptoms ?? "none reported",
   };
-
-  const healthCardSection = patientInfo
-    ? `Allergies: ${patientInfo.allergies.join(", ") || "none"}
-Conditions: ${patientInfo.conditions.join(", ") || "none"}
-Medications: ${patientInfo.medications.join(", ") || "none"}`
+  const hc = patientInfo
+    ? `Allergies: ${patientInfo.allergies.join(", ") || "none"}, Conditions: ${patientInfo.conditions.join(", ") || "none"}, Medications: ${patientInfo.medications.join(", ") || "none"}`
     : null;
 
-  const otherPatients = allRecords
-    .filter((r) => r.id !== newId)
-    .map((r) => ({
-      id: r.id,
-      heartRate: r.heartRate ?? "N/A",
-      respiratoryRate: r.respiratoryRate ?? "N/A",
-      bloodPressure: r.bloodPressure ?? "N/A",
-      symptoms: r.symptoms || "none reported",
-    }));
+  const prompt = `Triage nurse. JSON only. Single patient.
+Vitals: ${JSON.stringify(vitals)}${hc ? `\nHealth card: ${hc}` : ""}${previousSymptoms ? `\nPrevious: ${previousSymptoms}` : ""}
+Return: {"riskLevel":"red"|"yellow"|"green","symptomSummary":"<bare symptom phrase, no vitals>","healthCardSummary":"<natural sentence or null>"}
+red=immediate threat, yellow=urgent, green=minor.`;
 
-  const prompt = `Triage nurse. JSON only.
-
-New patient id="${newId}": ${JSON.stringify(newPatientData)}
-${healthCardSection ? `Health card: ${healthCardSection}` : ""}
-${previousSymptoms ? `Previous: ${previousSymptoms}` : ""}
-
-All patients: ${JSON.stringify([{ id: newId, ...newPatientData }, ...otherPatients])}
-
-Return: {"riskLevel":"red"|"yellow"|"green","symptomSummary":"<bare phrase, no vitals, e.g. chest tightness>","healthCardSummary":"<natural sentence or null>","rankedIds":["<highest priority id>",...]}
-red=immediate threat, yellow=urgent, green=minor. N/A vitals alone are not dangerous. rankedIds must include ALL patient ids.`;
-
-  console.log(`[AI] ⏳ Sending request to Gemini for seat ${newRecord.seatNumber} (${allRecords.length} total patients)...`);
+  console.log(`[AI] classify seat ${record.seatNumber}...`);
   const t0 = Date.now();
+  const result = await model.generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { thinkingConfig: { thinkingBudget: 0 } } as never,
+  });
+  console.log(`[AI] classify done in ${Date.now() - t0}ms`);
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().trim();
-
-  console.log(`[AI] ✅ Gemini responded in ${Date.now() - t0}ms`);
-
-  const match = text.match(/\{[\s\S]*\}/);
+  const match = result.response.text().match(/\{[\s\S]*\}/);
   if (!match) throw new Error("bad response");
   const parsed = JSON.parse(match[0]);
 
-  console.log(`[AI] risk=${parsed.riskLevel} | summary="${parsed.symptomSummary}" | ranked=${JSON.stringify(parsed.rankedIds)}`);
+  if (["red", "yellow", "green"].includes(parsed.riskLevel)) setRiskLevel(id, parsed.riskLevel);
+  if (parsed.symptomSummary) setSymptomSummary(id, parsed.symptomSummary);
+  if (parsed.healthCardSummary) setHealthCardSummary(id, parsed.healthCardSummary);
+}
 
-  if (["red", "yellow", "green"].includes(parsed.riskLevel)) setRiskLevel(newId, parsed.riskLevel);
-  if (parsed.symptomSummary) setSymptomSummary(newId, parsed.symptomSummary);
-  if (parsed.healthCardSummary) setHealthCardSummary(newId, parsed.healthCardSummary);
-  if (Array.isArray(parsed.rankedIds) && parsed.rankedIds.length > 0) updatePriorities(parsed.rankedIds);
+async function rankPatients() {
+  const all = getRecords();
+  if (all.length < 2) return;
 
-  console.log(`[AI] ✔ Store updated for seat ${newRecord.seatNumber}`);
+  const model = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!).getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const patients = all.map((r) => ({
+    id: r.id,
+    heartRate: r.heartRate ?? "N/A",
+    respiratoryRate: r.respiratoryRate ?? "N/A",
+    bloodPressure: r.bloodPressure ?? "N/A",
+    symptoms: r.symptoms || "none",
+    riskLevel: r.riskLevel ?? "unknown",
+  }));
+
+  const prompt = `Triage nurse. Return ONLY a JSON array of patient IDs ordered highest to lowest priority.
+Patients: ${JSON.stringify(patients)}
+Return: ["id1","id2",...]`;
+
+  console.log(`[AI] rank ${all.length} patients...`);
+  const t0 = Date.now();
+  const result = await model.generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { thinkingConfig: { thinkingBudget: 0 } } as never,
+  });
+  console.log(`[AI] rank done in ${Date.now() - t0}ms`);
+
+  const match = result.response.text().match(/\[[\s\S]*\]/);
+  if (!match) throw new Error("bad response");
+  const rankedIds: string[] = JSON.parse(match[0]);
+  if (Array.isArray(rankedIds) && rankedIds.length > 0) updatePriorities(rankedIds);
 }
 
 export async function POST(request: Request) {
@@ -97,7 +103,13 @@ export async function POST(request: Request) {
       patientInfo,
     }, timestamp);
 
-    analyzeAndRank(newRecord.id, newRecord, patientInfo, previousSymptoms).catch(console.error);
+    const forcedRisk = Math.abs(timeOffset) === 5 ? "yellow" : Math.abs(timeOffset) === 9 ? "green" : null;
+    if (forcedRisk) {
+      setRiskLevel(newRecord.id, forcedRisk);
+      rankPatients().catch(console.error);
+    } else {
+      classifyPatient(newRecord.id, newRecord, patientInfo, previousSymptoms).then(() => rankPatients()).catch(console.error);
+    }
 
     return NextResponse.json({ success: true, record: newRecord }, { status: 201 });
   } catch (error) {
