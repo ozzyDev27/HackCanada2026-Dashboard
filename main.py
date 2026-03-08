@@ -9,7 +9,7 @@ FILLER_PATIENTS = [
         "heartRate": 90,
         "respiratoryRate": 25,
         "bloodPressure": "140/95",
-        "symptoms": "chest is tight",
+        "symptoms": "burned hand on stove",
         "healthCardNumber": "1223-ED",
         "timeOffset": -5,
     },
@@ -24,7 +24,27 @@ FILLER_PATIENTS = [
     },
 ]
 
+a={
+        "seatNumber": 4,
+        "heartRate": 95,
+        "respiratoryRate": 15,
+        "bloodPressure": "131/92",
+        "symptoms": "hit head yesterday, now slightly dizzy (not very dizzy but still)",
+        "healthCardNumber": "6561-964-179-ED",
+        "timeOffset": 0,
+    }
+b={
+        "seatNumber": 4,
+        "heartRate": 100,
+        "respiratoryRate": 18,
+        "bloodPressure": "135/92",
+        "symptoms": "now throwing up",
+        "healthCardNumber": "6561-964-179-ED",
+        "timeOffset": 0,
+    }
+# res = requests.post(BASE_URL, json=b)
+
 
 for patient in FILLER_PATIENTS:
     res = requests.post(BASE_URL, json=patient)
-    # print(f"Seat {patient['seatNumber']}: {res.status_code} {res.text}")
+    print(f"Seat {patient['seatNumber']}: {res.status_code} {res.text}")

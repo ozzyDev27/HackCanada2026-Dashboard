@@ -48,9 +48,9 @@ console.log(`   ${["red", "yellow", "green"].includes(riskText) ? "✅ Valid ris
 // --- Test 2: Priority ranking ---
 console.log("🔬 Test 2: Priority ranking for multiple patients...");
 const patients = [
-  { id: "aaa", seatNumber: "B5", heartRate: 72, respiratoryRate: 16, bloodPressure: "120/80", symptoms: "papercut on finger" },
-  { id: "bbb", seatNumber: "C3", heartRate: 10, respiratoryRate: 1, bloodPressure: "60/40", symptoms: "not breathing, unresponsive" },
-  { id: "ccc", seatNumber: "D9", heartRate: 95, respiratoryRate: 22, bloodPressure: "150/95", symptoms: "chest tightness, short of breath" },
+//   { id: "aaa", seatNumber: "B5", heartRate: 72, respiratoryRate: 16, bloodPressure: "120/80", symptoms: "papercut on finger" },
+//   { id: "bbb", seatNumber: "C3", heartRate: 10, respiratoryRate: 1, bloodPressure: "60/40", symptoms: "not breathing, unresponsive" },
+//   { id: "ccc", seatNumber: "D9", heartRate: 95, respiratoryRate: 22, bloodPressure: "150/95", symptoms: "chest tightness, short of breath" },
 ];
 
 const rankPrompt = `You are a medical triage AI. Rank these patients from highest to lowest clinical priority.
